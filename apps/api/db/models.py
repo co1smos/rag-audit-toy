@@ -1,7 +1,10 @@
 import uuid
+import os
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import String, Integer, ForeignKey, Text, DateTime, func
 from pgvector.sqlalchemy import Vector
+
+EMB_DIM=int(os.getenv("EMB_DIM", "1536"))
 
 class Base(DeclarativeBase):
     pass
@@ -12,6 +15,8 @@ class Book(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     title: Mapped[str] = mapped_column(String, nullable=False)  # source_title
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[str] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    status: Mapped[str] = mapped_column(String, nullable=False, default="uploaded")  # uploaded, processing, indexed, index_failed
 
     chunks = relationship("Chunk", back_populates="book", cascade="all, delete-orphan")
 
@@ -32,6 +37,6 @@ class ChunkEmbedding(Base):
 
     chunk_id: Mapped[str] = mapped_column(String, ForeignKey("chunks.id"), primary_key=True)
     # 维度先不强行写死，后面接真实 embedding 再固定，比如 Vector(1536)
-    embedding: Mapped[list[float]] = mapped_column(Vector())
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMB_DIM))
 
     chunk = relationship("Chunk", back_populates="embedding")
