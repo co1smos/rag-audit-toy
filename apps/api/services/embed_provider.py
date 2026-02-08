@@ -1,22 +1,22 @@
 import hashlib, random
 from core.config import EMB_DIM
-from openai import OpenAI
+from google import genai
+from google.genai import types
 import os
+from dotenv import load_dotenv
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+load_dotenv()
+
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+MODEL_ID = "gemini-embedding-001"
 
 def embed_one(text: str):
-    # h = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    # seed = int(h[:16], 16)
-    # rnd = random.Random(seed)
-    # vec = [rnd.uniform(-1.0, 1.0) for _ in range(EMB_DIM)]
-    # norm = (sum(x*x for x in vec) ** 0.5) or 1.0
-    # return [x / norm for x in vec]
-    res = client.embeddings.create(
-        input=[text],
-        model="text-embedding-3-small"
+    res = client.models.embed_content(
+        model=MODEL_ID,
+        contents=[text],
+        config=types.EmbedContentConfig(output_dimensionality=EMB_DIM)
     )
-    return res.data[0].embedding
+    return res.embeddings[0].values
 
 
 def embed_texts_batched(texts: list[str]) -> list[list[float]]:

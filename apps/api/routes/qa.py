@@ -1,15 +1,18 @@
 # apps/api/routes/qa.py
-
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+import numpy as np
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import func, cast
+from sqlalchemy import func, cast, Float
+from sqlalchemy.dialects.postgresql import ARRAY # 确保导入了正确的 ARRAY
 from typing import List, Dict, Any
 
-from db.session import get_db
-from db.models import ChunkEmbedding, Chunk # 确保导入 Book 模型    
-from services.embed_provider import embed_one  # 你实现的 provider
-from services.openai_chat import get_answer_from_openai
+from core.config import EMB_DIM
+from pgvector.sqlalchemy import Vector
+from db.session import SessionLocal
+from db.models import ChunkEmbedding, Chunk 
+from services.embed_provider import embed_one 
+from services.chat_provider import generate_answer
 
 router = APIRouter()
 
@@ -21,28 +24,43 @@ class QAResponse(BaseModel):
     answer: str
     citations: List[Dict[str, Any]]
 
-SIMILARITY_THRESHOLD = 0.75
+# --- 数据库依赖注入 ---
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+SIMILARITY_THRESHOLD = 0.25
 TOP_K = 5
 
 @router.post("/qa", response_model=QAResponse)
-def question_answer(req: QARequest, db: Session = next(get_db())):
+def question_answer(req: QARequest, db: Session = Depends(get_db)):
     question = req.question
     book_id = req.book_id
 
     # 1. Embed the question
-    query_embedding = np.array(embed_one(question))  # 维度必须一致
+    query_embedding = embed_one(question)  # 维度必须一致
+    print(f"Query embedding 输出结果: {query_embedding[:5]}...")  # 调试输出前5维
 
     # 2. pgvector similarity search
+    distance_func = ChunkEmbedding.embedding.l2_distance(cast(query_embedding, Vector(EMB_DIM)))
+
     results = (
-        db.query(ChunkEmbedding, Chunk)
+        db.query(ChunkEmbedding, Chunk, distance_func.label("distance"))
         .join(Chunk, ChunkEmbedding.chunk_id == Chunk.id)
-        .filter(ChunkEmbedding.book_id == book_id)
-        .order_by(func.l2_distance(ChunkEmbedding.embedding, cast(query_embedding.tolist(), ARRAY(Float))))
+        .filter(Chunk.book_id == book_id)
+        .order_by("distance")
         .limit(TOP_K)
         .all()
     )
 
-    if not results or results[0].similarity < SIMILARITY_THRESHOLD:
+    print("Similarity search results (distance):")
+    for r in results:
+        print(f"  Distance: {r.distance}")
+
+    if not results or results[0].distance < SIMILARITY_THRESHOLD:
         return QAResponse(
             answer="我在当前资料中找不到依据，你可以提供章节或关键词吗？",
             citations=[]
@@ -53,12 +71,12 @@ def question_answer(req: QARequest, db: Session = next(get_db())):
     citations = []
 
     for i, row in enumerate(results):
-        block = f"[{i+1}] {row.content.strip()}"
+        block = f"[{i+1}] {row.Chunk.content.strip()}"
         context_blocks.append(block)
         citations.append({
-            "chunk_index": row.chunk_index,
-            "section": row.section,
-            "content": row.content
+            "chunk_index": row.Chunk.chunk_index,
+            "section": row.Chunk.section,
+            "content": row.Chunk.content
         })
 
     prompt = f"""
@@ -74,7 +92,10 @@ def question_answer(req: QARequest, db: Session = next(get_db())):
 """
 
     # 4. Call LLM
-    answer = get_answer_from_openai(prompt)
+    try:
+        answer = generate_answer(prompt)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"大模型调用失败: {str(e)}")
 
     return QAResponse(
         answer=answer.strip(),

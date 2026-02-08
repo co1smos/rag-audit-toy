@@ -31,6 +31,10 @@ apps/api/storage/audio/
 apps/api/storage/*.mp3
 apps/api/storage/*.wav
 
+apps/api/.direnv/*
+apps/api/.envrc
+
+
 # 测试缓存与结果
 tests/__pycache__/
 *.test

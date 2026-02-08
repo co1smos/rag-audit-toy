@@ -15,7 +15,7 @@ class Book(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     title: Mapped[str] = mapped_column(String, nullable=False)  # source_title
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[str] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    updated_at: Mapped[str] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
     status: Mapped[str] = mapped_column(String, nullable=False, default="uploaded")  # uploaded, processing, indexed, index_failed
 
     chunks = relationship("Chunk", back_populates="book", cascade="all, delete-orphan")
