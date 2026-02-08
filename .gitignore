@@ -1,1 +1,70 @@
+# Python 相关
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.log
+
+# 虚拟环境
+.venv/
+env/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 环境变量 / API key
 .env
+*.env
+
+# 数据库 / 嵌入文件
+*.sqlite3
+*.db
+*.bak
+*.pgdata
+*.pgwal
+pgdata/
+pgvector_data/
+*.jsonl
+
+# FastAPI 本地存储的音频等
+apps/api/storage/audio/
+apps/api/storage/*.mp3
+apps/api/storage/*.wav
+
+# 测试缓存与结果
+tests/__pycache__/
+*.test
+*.pytest_cache/
+.cache/
+.coverage
+
+# 前端（Next.js）相关
+node_modules/
+.next/
+out/
+npm-debug.log
+apps/web/.next/
+apps/web/node_modules/
+apps/web/.turbo/
+
+# 构建输出与临时
+dist/
+build/
+tmp/
+*.tmp
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.code-workspace
+
+# Codespaces & Devcontainers
+.devcontainer/
+.github/devcontainer.json
+
+# OS 系统文件
+.DS_Store
+Thumbs.db
+
+# GCP API for TTS
+gcp-key.json
